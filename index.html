@@ -1,0 +1,101 @@
+<!doctype html>
+<html lang="hi">
+<head>
+<meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">
+<title>Mini Ludo</title>
+<style>
+*{box-sizing:border-box}body{margin:0;background:#101827;color:#fff;font-family:system-ui,Arial;display:flex;justify-content:center;padding:16px}
+.app{width:min(100%,560px);text-align:center}.title{font-size:30px;font-weight:900;margin:4px 0}.sub{color:#b8c5d8;margin-bottom:12px}
+.panel{background:#1c293c;border:1px solid #34445e;border-radius:18px;padding:12px;margin:10px 0}
+#status{font-weight:700;min-height:26px}.controls{display:flex;gap:10px;justify-content:center;align-items:center;flex-wrap:wrap}
+button,select{border:0;border-radius:12px;padding:12px 16px;font-weight:800;font-size:16px}button{background:#ffca28;color:#241900}button:disabled{opacity:.45}
+#dice{font-size:34px;min-width:58px;background:#fff;color:#111;border-radius:12px;padding:3px 12px}
+.board{display:grid;grid-template-columns:repeat(15,1fr);gap:2px;background:#42516a;padding:5px;border-radius:14px;aspect-ratio:1}
+.cell{background:#f3f5f8;border-radius:3px;position:relative;display:flex;align-items:center;justify-content:center;min-width:0}
+.red{background:#ff6262}.green{background:#50d68a}.yellow{background:#ffd34f}.blue{background:#62a9ff}
+.home{border-radius:5px;display:grid;grid-template-columns:1fr 1fr;gap:4px;padding:5px}
+.home.red{grid-area:1/1/7/7}.home.green{grid-area:1/10/7/16}.home.yellow{grid-area:10/10/16/16}.home.blue{grid-area:10/1/16/7}
+.baseDot{background:#fff;border-radius:50%;width:38%;height:38%;box-shadow:inset 0 0 0 3px #ffffff99}
+.token{position:absolute;width:78%;height:78%;border:2px solid white;border-radius:50%;z-index:3;box-shadow:0 1px 4px #0008;display:flex;align-items:center;justify-content:center;color:#111;font-size:10px;font-weight:900}
+.token.red{background:#ed3030}.token.green{background:#16a85a}.token.yellow{background:#f4b900}.token.blue{background:#2678e8}
+.token.movable{outline:3px solid #fff;animation:pulse .7s infinite alternate;cursor:pointer}
+@keyframes pulse{to{transform:scale(1.15)}}
+.center{grid-area:7/7/10/10;background:conic-gradient(#50d68a 0 25%,#ffd34f 0 50%,#62a9ff 0 75%,#ff6262 0);border:2px solid white}
+.legend{display:flex;justify-content:space-around;flex-wrap:wrap;gap:6px;font-size:13px}
+.dot{display:inline-block;width:10px;height:10px;border-radius:50%;margin-right:5px}
+.note{font-size:12px;color:#b8c5d8;line-height:1.5}
+</style></head>
+<body><main class="app">
+<div class="title">🎲 MINI LUDO</div><div class="sub">मोबाइल पर दोस्तों के साथ खेलें</div>
+<div class="panel">
+<div class="controls"><label>खिलाड़ी <select id="players"><option value="2">2 खिलाड़ी</option><option value="3">3 खिलाड़ी</option><option value="4" selected>4 खिलाड़ी</option></select></label><button id="new">नया गेम</button></div>
+<div id="status">पासा फेंकें और खेल शुरू करें!</div>
+<div class="controls"><div id="dice">⚀</div><button id="roll">पासा फेंको 🎲</button></div>
+</div>
+<div id="board" class="board"></div>
+<div class="panel legend"><span><i class="dot" style="background:#ed3030"></i>लाल</span><span><i class="dot" style="background:#16a85a"></i>हरा</span><span><i class="dot" style="background:#f4b900"></i>पीला</span><span><i class="dot" style="background:#2678e8"></i>नीला</span></div>
+<div class="panel note">नियम: गोटी बाहर निकालने के लिए 6 चाहिए। 6 आने पर दोबारा पासा फेंकें। विरोधी की गोटी काटने पर सुरक्षित खाने के अलावा वह घर लौट जाती है। जीतने के लिए हर गोटी को पूरा चक्कर लगाकर बीच तक पहुँचाएँ।</div>
+</main>
+<script>
+const board=document.getElementById('board'), statusEl=document.getElementById('status'), diceEl=document.getElementById('dice'), rollBtn=document.getElementById('roll');
+const colors=['red','green','yellow','blue'], names=['लाल','हरा','पीला','नीला'];
+const starts=[0,13,26,39], safe=[0,8,13,21,26,34,39,47];
+const path=[[6,1],[6,2],[6,3],[6,4],[6,5],[5,6],[4,6],[3,6],[2,6],[1,6],[0,6],[0,7],[0,8],[1,8],[2,8],[3,8],[4,8],[5,8],[6,9],[6,10],[6,11],[6,12],[6,13],[6,14],[7,14],[8,14],[8,13],[8,12],[8,11],[8,10],[8,9],[9,8],[10,8],[11,8],[12,8],[13,8],[14,8],[14,7],[14,6],[13,6],[12,6],[11,6],[10,6],[9,6],[8,5],[8,4],[8,3],[8,2],[8,1],[8,0],[7,0],[6,0]];
+let players=4, turn=0, dice=0, rolled=false, tokens=[];
+const cells={};
+function init(){
+ players=+document.getElementById('players').value;turn=0;dice=0;rolled=false;
+ tokens=colors.map((c,p)=>Array.from({length:4},()=>({step:-1,done:false})));
+ board.innerHTML='';Object.keys(cells).forEach(k=>delete cells[k]);
+ for(let r=0;r<15;r++)for(let c=0;c<15;c++){let el=document.createElement('div');el.className='cell';el.style.gridArea=`${r+1}/${c+1}`;board.appendChild(el);cells[`${r},${c}`]=el;}
+ [['red','1/1/7/7'],['green','1/10/7/16'],['yellow','10/10/16/16'],['blue','10/1/16/7']].forEach(([co,area])=>{
+ let h=document.createElement('div');h.className='home '+co;h.style.gridArea=area;
+ for(let i=0;i<4;i++){let d=document.createElement('div');d.className='baseDot';h.appendChild(d)}board.appendChild(h);
+ });
+ path.forEach(([r,c],i)=>{let el=cells[`${r},${c}`];el.className='cell';if(i%13===0)el.classList.add(colors[Math.floor(i/13)]);if(safe.includes(i))el.textContent='★';});
+ let center=document.createElement('div');center.className='cell center';board.appendChild(center);
+ draw();updateStatus('लाल खिलाड़ी की बारी — पासा फेंकें।');
+}
+function coord(p,t){
+ if(t.step===-1){let bases=[[[2,2],[2,4],[4,2],[4,4]],[[2,10],[2,12],[4,10],[4,12]],[[10,10],[10,12],[12,10],[12,12]],[[10,2],[10,4],[12,2],[12,4]]];return bases[p][tokens[p].indexOf(t)];}
+ if(t.step>=52)return [[7,7],[7,7],[7,7],[7,7]][p];
+ let idx=(starts[p]+t.step)%52;return path[idx];
+}
+function draw(){
+ document.querySelectorAll('.token').forEach(x=>x.remove());
+ tokens.forEach((arr,p)=>arr.forEach((t,i)=>{
+ let [r,c]=coord(p,t),el=cells[`${r},${c}`];if(!el)return;
+ let b=document.createElement('div');b.className='token '+colors[p]+(rolled&&p===turn&&isMovable(t)?' movable':'');b.textContent=i+1;
+ b.onclick=()=>move(p,i);el.appendChild(b);
+ }));
+ rollBtn.disabled=rolled||tokens[turn].every(t=>t.done);
+}
+function isMovable(t){return !t.done&&(t.step===-1?dice===6:t.step+dice<=57);}
+function updateStatus(msg){statusEl.textContent=msg;}
+function roll(){
+ if(rolled)return;dice=1+Math.floor(Math.random()*6);rolled=true;
+ diceEl.textContent=['','⚀','⚁','⚂','⚃','⚄','⚅'][dice];
+ let moves=tokens[turn].filter(isMovable).length;
+ if(!moves){updateStatus(`${names[turn]} को ${dice} आया — चाल नहीं, अगली बारी।`);draw();setTimeout(nextTurn,900);}
+ else{updateStatus(`${names[turn]} को ${dice} आया — चमकती गोटी चुनें।`);draw();}
+}
+function move(p,i){
+ if(!rolled||p!==turn)return;let t=tokens[p][i];if(!isMovable(t))return;
+ if(t.step===-1)t.step=0;else t.step+=dice;
+ if(t.step===57){t.done=true;}
+ else if(t.step<52){
+ let landing=(starts[p]+t.step)%52;
+ if(!safe.includes(landing)){
+  tokens.forEach((arr,op)=>{if(op!==p)arr.forEach(other=>{if(other.step>=0&&other.step<52&&(starts[op]+other.step)%52===landing)other.step=-1;});});
+ }
+ }
+ let won=tokens[p].every(x=>x.done);
+ let six=dice===6;rolled=false;dice=0;draw();
+ if(won){updateStatus(`🏆 ${names[p]} खिलाड़ी जीत गया! नया गेम दबाएँ।`);rollBtn.disabled=true;return;}
+ if(six){updateStatus(`${names[p]} की बारी फिर से — 6 आया!`);}
+ else{turn=(turn+1)%players;while(tokens[turn].every(x=>x.done))turn=(turn+1)%players;updateStatus(`${names[turn]} खिलाड़ी की बारी — पासा फेंकें।`);}
+ draw();
+}
+function nextTurn(){rolled=false;dice=0;turn=(turn+1)%players;while(tokens[turn].every(x=>x.done))turn=(turn+1)%players;draw();updateStatus(`${names[turn]} खिलाड़ी की बारी — पासा फेंकें।`);}
+rollBtn.onclick=roll;document.getElementById('new').onclick=init;document.getElementById('players').onchange=init;init();
+</script></body></html>
